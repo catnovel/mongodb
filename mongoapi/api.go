@@ -2,7 +2,9 @@ package mongoapi
 
 import (
 	"context"
+	"fmt"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DB struct {
@@ -11,48 +13,116 @@ type DB struct {
 	Collection string
 }
 
+func (d *DB) getCTX() context.Context {
+	return context.Background()
+}
+
 func (d *DB) SetDatabase(database string) *DB {
 	d.Database = database
 	return d
-
 }
 func (d *DB) SetCollection(collection string) *DB {
 	d.Collection = collection
 	return d
 }
 
-// InsertOne 插入一个文档
-func (d *DB) insertOneResult(doc interface{}) (*mongo.InsertOneResult, error) {
-	return d.Client.Database(d.Database).Collection(d.Collection).InsertOne(context.Background(), doc)
+func (d *DB) GetCollection() *mongo.Collection {
+	dbs := d.GetDatabase()
+	if dbs == nil || d.Collection == "" {
+		return nil
+	}
+	return dbs.Collection(d.Collection)
+}
+func (d *DB) GetDatabase() *mongo.Database {
+	if d.Database == "" {
+		return nil
+	}
+	return d.Client.Database(d.Database)
+}
+func (d *DB) getEmptyError() error {
+	return fmt.Errorf(fmt.Sprintf("database:%s collection:%s is nil", d.Database, d.Collection))
 }
 func (d *DB) InsertOne(doc interface{}) error {
-	_, err := d.insertOneResult(doc)
-	return err
+	if col := d.GetCollection(); col != nil {
+		insertOneId, err := col.InsertOne(d.getCTX(), doc)
+		if err != nil {
+			return err
+		}
+		if insertOneId.InsertedID == nil {
+			return fmt.Errorf("inserted id is nil")
+		}
+		return err
+
+	}
+	return d.getEmptyError()
 }
 
 // FindOne 查询单个文档
 func (d *DB) FindOne(filter interface{}) *mongo.SingleResult {
-	return d.Client.Database(d.Database).Collection(d.Collection).FindOne(context.Background(), filter)
+	if col := d.GetCollection(); col != nil {
+		return col.FindOne(d.getCTX(), filter)
+	}
+	return nil
+}
+func (d *DB) FindOneAndResult(filter interface{}, result interface{}) error {
+	return d.FindOne(filter).Decode(result)
 }
 
 func (d *DB) Find(filter interface{}) (*mongo.Cursor, error) {
-	return d.Client.Database(d.Database).Collection(d.Collection).Find(context.Background(), filter)
+	if col := d.GetCollection(); col != nil {
+		return col.Find(d.getCTX(), filter)
+	}
+	return nil, d.getEmptyError()
 }
+func (d *DB) FindAndResult(filter interface{}, result interface{}) error {
+	cur, err := d.Find(filter)
+	if err != nil {
+		return err
+	}
+	return cur.All(d.getCTX(), result)
+}
+
 func (d *DB) UpdateOne(filter, update interface{}) (*mongo.UpdateResult, error) {
-	return d.Client.Database(d.Database).Collection(d.Collection).UpdateOne(context.Background(), filter, update)
+	if col := d.GetCollection(); col != nil {
+		return col.UpdateOne(d.getCTX(), filter, update)
+	}
+	return nil, d.getEmptyError()
 }
 
+func (d *DB) UpdateMany(filter, update interface{}) (*mongo.UpdateResult, error) {
+	if col := d.GetCollection(); col != nil {
+		return col.UpdateMany(d.getCTX(), filter, update)
+	}
+	return nil, d.getEmptyError()
+}
+func (d *DB) UpdateAndInsertOne(filter, update interface{}) (*mongo.UpdateResult, error) {
+	if col := d.GetCollection(); col != nil {
+		return col.UpdateOne(d.getCTX(), filter, update, options.Update().SetUpsert(true))
+	}
+	return nil, d.getEmptyError()
+}
 func (d *DB) DeleteOne(filter interface{}) (*mongo.DeleteResult, error) {
-	return d.Client.Database(d.Database).Collection(d.Collection).DeleteOne(context.Background(), filter)
+	return d.Client.Database(d.Database).Collection(d.Collection).DeleteOne(d.getCTX(), filter)
 }
 
-func (d *DB) CreateIndex(collection string, keys map[string]interface{}) error {
-	_, err := d.Client.Database(d.Database).Collection(collection).Indexes().CreateOne(context.Background(), mongo.IndexModel{
-		Keys: keys,
-	})
-	return err
+func (d *DB) CreateIndex(unique bool, keys map[string]interface{}) error {
+	if col := d.GetCollection(); col != nil {
+		_, err := col.Indexes().CreateOne(d.getCTX(), mongo.IndexModel{Keys: keys, Options: options.Index().SetUnique(unique)})
+		return err
+	}
+	return d.getEmptyError()
 }
-func (d *DB) CreateManyIndex(collection string, models []mongo.IndexModel) error {
-	_, err := d.Client.Database(d.Database).Collection(collection).Indexes().CreateMany(context.Background(), models)
-	return err
+func (d *DB) CreateManyIndex(models []map[string]interface{}) []error {
+	var errs []error
+	for _, model := range models {
+		if col := d.GetCollection(); col != nil {
+			_, err := col.Indexes().CreateOne(d.getCTX(), mongo.IndexModel{Keys: model})
+			if err != nil {
+				errs = append(errs, err)
+			}
+		} else {
+			errs = append(errs, d.getEmptyError())
+		}
+	}
+	return errs
 }
