@@ -45,3 +45,14 @@ func (d *DB) UpdateOne(filter, update interface{}) (*mongo.UpdateResult, error) 
 func (d *DB) DeleteOne(filter interface{}) (*mongo.DeleteResult, error) {
 	return d.Client.Database(d.Database).Collection(d.Collection).DeleteOne(context.Background(), filter)
 }
+
+func (d *DB) CreateIndex(collection string, keys map[string]interface{}) error {
+	_, err := d.Client.Database(d.Database).Collection(collection).Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys: keys,
+	})
+	return err
+}
+func (d *DB) CreateManyIndex(collection string, models []mongo.IndexModel) error {
+	_, err := d.Client.Database(d.Database).Collection(collection).Indexes().CreateMany(context.Background(), models)
+	return err
+}

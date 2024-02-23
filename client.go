@@ -5,6 +5,7 @@ import (
 	"github.com/catnovel/mongodb/mongoapi"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 )
 
 func NewClient(opt ...ClientOptionFunc) (*Client, error) {
@@ -22,6 +23,7 @@ func newMongoDBClient(opt ...ClientOptionFunc) (*Client, error) {
 	for _, o := range opt {
 		o.Apply(client)
 	}
+	//fmt.Println(client)
 	var err error
 	clientOptions := options.Client().ApplyURI(client.uri)
 	if client.poolMaxSize > 0 {
@@ -47,17 +49,13 @@ func newMongoDBClient(opt ...ClientOptionFunc) (*Client, error) {
 }
 
 // Disconnect 关闭MongoDB客户端连接
-func (m *Client) Disconnect() error {
-	return m.Client.Disconnect(m.defaultContext)
+func (m *Client) Disconnect() {
+	err := m.Client.Disconnect(m.defaultContext)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (m *Client) NewDB() *mongoapi.DB {
-	db := &mongoapi.DB{Client: m.Client, Database: m.defaultDBName, Collection: m.defaultCollectionName}
-	if m.defaultDBName != "" {
-		db.Database = m.defaultDBName
-	}
-	if m.defaultCollectionName != "" {
-		db.Collection = m.defaultCollectionName
-	}
-	return db
+	return &mongoapi.DB{Client: m.Client, Database: m.defaultDBName, Collection: m.defaultCollectionName}
 }
