@@ -56,6 +56,15 @@ func (m *Client) Disconnect() {
 	}
 }
 
-func (m *Client) NewDB() *mongoapi.DB {
+func (m *Client) DB() *mongoapi.DB {
 	return &mongoapi.DB{Client: m.Client, Database: m.defaultDBName, Collection: m.defaultCollectionName}
+}
+func (m *Client) DbByCollection(collection string) *mongoapi.DB {
+	return m.DB().SetCollection(collection)
+}
+func (m *Client) DbByDatabase(database string) *mongoapi.DB {
+	return m.DB().SetDatabase(database)
+}
+func (m *Client) NewDB(database string, collection string) *mongoapi.DB {
+	return m.DB().SetDatabase(database).SetCollection(collection)
 }
