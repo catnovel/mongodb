@@ -23,7 +23,6 @@ func newMongoDBClient(opt ...ClientOptionFunc) (*Client, error) {
 	for _, o := range opt {
 		o.Apply(client)
 	}
-	//fmt.Println(client)
 	var err error
 	clientOptions := options.Client().ApplyURI(client.uri)
 	if client.poolMaxSize > 0 {

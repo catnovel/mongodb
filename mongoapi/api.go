@@ -95,14 +95,25 @@ func (d *DB) UpdateMany(filter, update interface{}) (*mongo.UpdateResult, error)
 	}
 	return nil, d.getEmptyError()
 }
-func (d *DB) UpdateAndInsertOne(filter, update interface{}) (*mongo.UpdateResult, error) {
+
+func (d *DB) UpdateAndInsertOne(filter, update interface{}) error {
 	if col := d.GetCollection(); col != nil {
-		return col.UpdateOne(d.getCTX(), filter, update, options.Update().SetUpsert(true))
+		_, err := col.UpdateOne(d.getCTX(), filter, update, options.Update().SetUpsert(true))
+		return err
 	}
-	return nil, d.getEmptyError()
+	return d.getEmptyError()
 }
-func (d *DB) DeleteOne(filter interface{}) (*mongo.DeleteResult, error) {
-	return d.Client.Database(d.Database).Collection(d.Collection).DeleteOne(d.getCTX(), filter)
+func (d *DB) DeleteMany(filter interface{}) error {
+	if col := d.GetCollection(); col != nil {
+		_, err := col.DeleteMany(d.getCTX(), filter)
+		return err
+	}
+	return d.getEmptyError()
+}
+
+func (d *DB) DeleteOne(filter interface{}) error {
+	_, err := d.Client.Database(d.Database).Collection(d.Collection).DeleteOne(d.getCTX(), filter)
+	return err
 }
 
 func (d *DB) CreateIndex(unique bool, keys map[string]interface{}) error {
